@@ -1,0 +1,98 @@
+     1                                      BOOT_LOAD equ 0x7c00
+     2                                      ORG BOOT_LOAD
+     3                                  
+     4                                  %include "../include/macro.s"
+     1                              <1> %macro cdecl 1-*.nolist
+     2                              <1>     %rep  %0 - 1
+     3                              <1>         push   %{-1:-1}
+     4                              <1>         %rotate -1
+     5                              <1>     %endrep
+     6                              <1>     %rotate -1
+     7                              <1>         call    %1
+     8                              <1>     %if 1 < %0
+     9                              <1>         add    sp,(__BITS__>>3)*(%0 - 1)
+    10                              <1>     %endif
+    11                              <1> 
+    12                              <1>     
+    13                              <1> 
+    14                              <1> %endmacro
+    15                              <1> 
+     5                                  
+     6                                  entry:
+     7 00000000 EB58                        jmp ipl                     ; Jump to IPL code
+     8 00000002 90<rep 58h>                 times 90 - ($ - $$) db 0x90
+     9                                  
+    10                                  ipl:
+    11 0000005A FA                          cli
+    12 0000005B B80000                      mov ax, 0x0000              ; Set data segment registers to 0
+    13 0000005E 8ED8                        mov ds, ax
+    14 00000060 8EC0                        mov es, ax
+    15 00000062 8ED0                        mov ss, ax
+    16 00000064 BC007C                      mov sp, BOOT_LOAD           ; Set stack pointer
+    17 00000067 FB                          sti
+    18                                  
+    19 00000068 8816[9200]                  mov [BOOT.DRIVE], dl        ; Store boot drive
+    20                                  
+    21                                      ; Print "Hoge" 15 times
+    22 0000006C B90000                      mov cx, 0                   ; Initialize counter
+    23                                  .LOOP:
+    24 0000006F 83F90F                      cmp cx, 15
+    25 00000072 7D0C                        jge .READ_KEY               ; Jump to read key if "Hoge" printed 15 times
+    26                                  
+    27 00000074 68[8A00]E81A0083C4-         cdecl puts, .s0             ; Display "Hoge"
+    27 0000007C 02                 
+    28 0000007D 41                          inc cx                      ; Increment counter
+    29 0000007E EBEF                        jmp .LOOP                   ; Loop to print again
+    30                                  
+    31                                  .READ_KEY:
+    32 00000080 B400                        mov ah, 0x00                ; BIOS Function: Wait for keypress
+    33 00000082 CD16                        int 0x16                    ; Call BIOS keyboard interrupt
+    34                                  
+    35 00000084 3C0D                        cmp al, 0x0D                ; Compare with Enter key (0x0D)
+    36 00000086 75F8                        jne .READ_KEY               ; If not Enter, continue waiting
+    37                                  
+    38 00000088 CD19                        int 0x19                    ; Restart system
+    39                                  
+    40 0000008A 486F67650A0D00          .s0 db "Hoge", 0x0A, 0x0D, 0    ; Message to print
+    41                                  
+    42 00000091 00                      ALIGN 2, db 0
+    43                                  BOOT:
+    44 00000092 0000                    .DRIVE: dw 0
+    45                                  
+    46                                  %include "../modules/real/puts.s"
+     1                              <1> 
+     2                              <1> puts:
+     3                              <1> 
+     4 00000094 55                  <1>       push   bp
+     5 00000095 89E5                <1>       mov    bp, sp
+     6                              <1> 
+     7 00000097 50                  <1>       push   ax
+     8 00000098 53                  <1>       push   bx
+     9 00000099 56                  <1>       push   si
+    10                              <1>       
+    11 0000009A 8B7604              <1>       mov    si, [bp + 4]
+    12                              <1> 
+    13 0000009D B40E                <1>       mov    ah, 0x0E
+    14 0000009F BB0000              <1>       mov    bx, 0x0000
+    15 000000A2 FC                  <1>       cld
+    16                              <1> .10L:
+    17 000000A3 AC                  <1>       lodsb
+    18                              <1> 
+    19 000000A4 3C00                <1>       cmp    al, 0
+    20 000000A6 7404                <1>       je     .10E
+    21                              <1> 
+    22 000000A8 CD10                <1>       int    0x10
+    23 000000AA EBF7                <1>       jmp    .10L
+    24                              <1> .10E:
+    25                              <1> 
+    26 000000AC 5E                  <1>       pop    si
+    27 000000AD 5B                  <1>       pop    bx
+    28 000000AE 58                  <1>       pop    ax
+    29                              <1> 
+    30 000000AF 89EC                <1>       mov    sp, bp    
+    31 000000B1 5D                  <1>       pop    bp
+    32                              <1>       
+    33 000000B2 C3                  <1>       ret
+    47                                  
+    48 000000B3 00<rep 14Bh>            times 510 - ($ - $$) db 0x00
+    49 000001FE 55AA                    db 0x55, 0xAA

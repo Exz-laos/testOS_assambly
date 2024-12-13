@@ -1,0 +1,146 @@
+     1                                  
+     2                                          BOOT_LOAD equ 0x7c00
+     3                                          ORG    BOOT_LOAD
+     4                                  %include "../include/macro.s"
+     1                              <1> %macro cdecl 1-*.nolist
+     2                              <1>     %rep  %0 - 1
+     3                              <1>         push   %{-1:-1}
+     4                              <1>         %rotate -1
+     5                              <1>     %endrep
+     6                              <1>     %rotate -1
+     7                              <1>         call    %1
+     8                              <1>     %if 1 < %0
+     9                              <1>         add    sp,(__BITS__>>3)*(%0 - 1)
+    10                              <1>     %endif
+    11                              <1> %endmacro
+    12                              <1> 
+    13                              <1>     struc drive
+    14 00000000 ????                <1>           .no     resw  1
+    15 00000002 ????                <1>           .cyln   resw  1
+    16 00000004 ????                <1>           .head   resw  1
+    17 00000006 ????                <1>           .sect   resw  1
+    18                              <1>     endstruc
+    19                              <1> 
+     5                                  entry: 
+     6 00000000 EB58                            jmp   ipl          ;IPL jump
+     7 00000002 90<rep 58h>                     times 90 - ($ - $$) db 0x90 ;
+     8                                  
+     9                                  ipl:    
+    10 0000005A FA                              cli
+    11 0000005B B80000                          mov   ax, 0x0000
+    12 0000005E 8ED8                            mov   ds, ax
+    13 00000060 8EC0                            mov   es, ax
+    14 00000062 8ED0                            mov   ss, ax
+    15 00000064 BC007C                          mov   sp, BOOT_LOAD
+    16 00000067 FB                              sti
+    17                                         
+    18 00000068 8816[B800]                      mov   [BOOT.DRIVE], dl
+    19                                          
+    20 0000006C 68[9800]E8480083C4-             cdecl puts, .s0   
+    20 00000074 02                 
+    21                                          
+    22                                          ;--------------------------------------------------------
+    23                                          ;read 512 bytes 
+    24 00000075 B402                            mov  ah, 0x02
+    25 00000077 B001                            mov  al, 1
+    26 00000079 B90200                          mov  cx, 0x0002
+    27 0000007C B600                            mov  dh, 0x00
+    28 0000007E 8A16[B800]                      mov  dl, [BOOT.DRIVE]
+    29 00000082 BB007E                          mov  bx, 0x7C00 + 512 
+    30 00000085 CD13                            int  0x13
+    31 00000087 730C                    .10Q:   jnc  .10E
+    32 00000089 68[A500]E82B0083C4-     .10T:   cdecl puts, .e0
+    32 00000091 02                 
+    33 00000092 E84400                          call  reboot
+    34                                  .10E:   
+    35                                          ;move to next stage
+    36 00000095 E96801                          jmp    stage_2
+    37                                          ;data
+    38                                         
+    39 00000098 426F6F74696E672E2E-     .s0     db "Booting...",  0x0A, 0x0D, 0
+    39 000000A1 2E0A0D00           
+    40 000000A5 4572726F723A207365-     .e0     db "Error: sector read", 0
+    40 000000AE 63746F722072656164-
+    40 000000B7 00                 
+    41                                  
+    42                                  ALIGN 2, db 0
+    43                                  BOOT:
+    44 000000B8 0000                    .DRIVE:    dw 0
+    45                                  
+    46                                  %include "../modules/real/puts.s"
+     1                              <1> 
+     2                              <1> puts:
+     3                              <1> 
+     4 000000BA 55                  <1>       push   bp
+     5 000000BB 89E5                <1>       mov    bp, sp
+     6                              <1> 
+     7 000000BD 50                  <1>       push   ax
+     8 000000BE 53                  <1>       push   bx
+     9 000000BF 56                  <1>       push   si
+    10                              <1>       
+    11 000000C0 8B7604              <1>       mov    si, [bp + 4]
+    12                              <1> 
+    13 000000C3 B40E                <1>       mov    ah, 0x0E
+    14 000000C5 BB0000              <1>       mov    bx, 0x0000
+    15 000000C8 FC                  <1>       cld
+    16                              <1> .10L:
+    17 000000C9 AC                  <1>       lodsb
+    18                              <1> 
+    19 000000CA 3C00                <1>       cmp    al, 0
+    20 000000CC 7404                <1>       je     .10E
+    21                              <1> 
+    22 000000CE CD10                <1>       int    0x10
+    23 000000D0 EBF7                <1>       jmp    .10L
+    24                              <1> .10E:
+    25                              <1> 
+    26 000000D2 5E                  <1>       pop    si
+    27 000000D3 5B                  <1>       pop    bx
+    28 000000D4 58                  <1>       pop    ax
+    29                              <1> 
+    30 000000D5 89EC                <1>       mov    sp, bp    
+    31 000000D7 5D                  <1>       pop    bp
+    32                              <1>       
+    33 000000D8 C3                  <1>       ret
+    47                                  %include "../modules/real/reboot.s"
+     1                              <1> reboot:
+     2 000000D9 68[F500]E8DBFF83C4- <1>        cdecl puts,  .s0
+     2 000000E1 02                  <1>
+     3                              <1> 
+     4                              <1> .10L: 
+     5 000000E2 B410                <1>      mov     ah, 0x10
+     6 000000E4 CD16                <1>      int     0x16
+     7                              <1> 
+     8 000000E6 3C20                <1>      cmp     al, ' '
+     9 000000E8 75F8                <1>      jne     .10L
+    10                              <1> 
+    11 000000EA 68[1301]E8CAFF83C4- <1>      cdecl   puts, .s1
+    11 000000F2 02                  <1>
+    12                              <1> 
+    13 000000F3 CD19                <1>      int     0x19
+    14                              <1> 
+    15 000000F5 0A0D50757368205350- <1> .s0  db 0x0A, 0x0D, "Push SPACE ket to reboot...", 0
+    15 000000FE 414345206B65742074- <1>
+    15 00000107 6F207265626F6F742E- <1>
+    15 00000110 2E2E00              <1>
+    16 00000113 0A0D0A0D00          <1> .s1  db 0x0A, 0x0D, 0x0A, 0x0d, 0
+    48                                  
+    49 00000118 00<rep E6h>                     times   510 - ($ - $$) db 0x00
+    50 000001FE 55AA                            db      0x55, 0xAA
+    51                                  
+    52                                  ;********************************
+    53                                  ;Second stage of boot process
+    54                                  ;********************************
+    55                                  stage_2: 
+    56 00000200 68[0B02]E8B4FE83C4-             cdecl   puts, .s0
+    56 00000208 02                 
+    57                                  
+    58 00000209 EBFE                            jmp  $
+    59                                  
+    60 0000020B 326E64207374616765-     .s0     db "2nd stage...", 0x0A, 0x0D, 0
+    60 00000214 2E2E2E0A0D00       
+    61                                  
+    62                                  ;padding(the file is 8k bytes)
+    63                                  
+    64 0000021A 00<rep 1DE6h>                   times (1024* 8)-($ - $$) db 0 
+    65                                         
+    66                                   
