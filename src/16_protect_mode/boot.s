@@ -107,7 +107,8 @@ ACPI_DATA:
 %include "../modules/real/get_font_adr.s"
 %include "../modules/real/get_mem_info.s"
 %include "../modules/real/kbc.s"
-
+%include "../modules/real/lba_chs.s"
+%include "../modules/real/read_lba.s"
 ;***********************************************************
 ;  ブート処理の第2ステージ
 ;***********************************************************
@@ -302,17 +303,67 @@ stage_4:
         ;----------------------------------
         ;display letter
         ;-------------------------------------
-        cdecl puts, .s3
+cdecl puts, .s3
 
-        jmp    $
+jmp    stage_5
 .s0:    db  "4th stage...", 0x0A, 0x0D, 0
 .s1:    db "A20 Gate Enabled.", 0x0A, 0x0D, 0
 .s2:    db "Keyboard LED Test...", 0
 .s3:    db "(done)", 0x0A, 0x0D, 0
 .e0:    db "[ ", 0
 .e1:    db "ZZ]", 0
-
 .key:   dw  0
+
+stage_5:
+         ;---------------------------------------
+         ;
+         ;---------------------------------------
+         cdecl    puts, .s0
+         ;----
+         ;
+         ;----
+         cdecl    read_lba, BOOT, BOOT_SECT, KERNEL_SECT, BOOT_END
+
+         cmp     ax, KERNEL_SECT
+
+.10Q:    jz      .10E
+.10T:    cdecl    puts, .e0
+         call     reboot
+.10E:    
+        ;---------------------------------------
+        ;
+        ;---------------------------------------
+        jmp     stage_6
+.s0:    db  "5th stage...", 0x0A, 0x0D, 0
+.e0:    db "Failure load kernel...", 0x0A, 0x0D, 0
+
+
+
+stage_6:
+         ;---------------------------------------
+         ;display letters
+         ;---------------------------------------
+         cdecl    puts, .s0
+         ;----
+         ;wait key from user
+         ;----
+.10L:    
+        mov    ah, 0x00
+        int    0x16
+        cmp    al, ''
+        jne    .10L
+       
+        ;---------------------------------------
+        ;set video mode
+        ;---------------------------------------
+        mov    ax, 0x0012
+        int    0x10
+
+        jmp    $
+.s0:    db  "6th stage...", 0x0A, 0x0D, 0x0A, 0x0D
+        db   " [Push SPACE key to protect mode ...]", 0x0A, 0x0D, 0
+
+
 ;***********************************************************
 ;  パディング（このファイルは8Kバイトとする）
 ;***********************************************************
